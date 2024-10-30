@@ -1,53 +1,50 @@
 import requests as r
 from bs4 import BeautifulSoup as bs
 
-import UserAgents as ua
-import random
+from sender import send_email
 
-def createUserAgents():
-    return f"User-Agent : ${ua.UserAgents[random.randint(0,len(ua.UserAgents)-1)]}"
-    
-def createRiskyUserAgents():
-    return f"User-Agent : ${ua.RiskyUserAgents[random.randint(0,len(ua.RiskyUserAgents)-1)]}"
+from dotenv import load_dotenv
+import os
+from os.path import join, dirname
 
-def createProxy(proxies):
-    proxies = proxies.get('data')
-    proxy = proxies[random.randint(0,len(proxies)-1)]
-    proxies = {
-   'http': f"http://{proxy.get('ip')}:{proxy.get('port')}",
-   'https': f"https://{proxy.get('ip')}:{proxy.get('port')}",
-}
-# you can replace the f strings with your proxy that works  
-    print(proxies)
-    return proxies
+dotenv_path = join(dirname(__file__), '.env')
+load_dotenv(dotenv_path)
 
-def createProxyDic():
-    proxylist = get("https://proxylist.geonode.com/api/proxy-list?limit=50&page=1&sort_by=lastChecked&sort_type=desc&filterUpTime=100&speed=fast&protocols=https")
-    if proxylist.status_code == 200:
-        proxies = proxylist.json()
-        return createProxy(proxies) 
-    else:
-        print ("Proxylist down")
-    #FREE PROXIES ARE KINDA BROKEN'- most likely won't work. U can use https://openproxy.space/ or https://spys.one/en/ or some better side. it sometimes work:D
+port = os.environ.get("PORT")
+smtp_server = os.environ.get("SMTP_SERVER")
+sender_email = os.environ.get("SENDER_EMAIL")
+password = os.environ.get("PASSWORD")
+email = os.environ.get("RECEIVER_EMAIL")
+path_to_file = os.environ.get("VENUES")
 
+url = "https://lidovajidelna.cz"
 
 def get(url):
-    headers = createUserAgents()
-    page = r.get(url,headers)
-    return page
-
-def proxyGet(url):
-    proxies = createProxyDic()
-    page = r.get(url,proxies=proxies)
+    page = r.get(url)
     return page
 
 def soup(page):
     return bs(page.content, 'html.parser')
 
-def Main():
-    """
-Parse your things here from the soup object - suggest using things like find_all("a", class_="sister") / you can also use list ("a", ["stylelistrowone", "stylelistrow"])
-expected usage is soup(get("https://example.com")) and then anything you love.
+def main():
+    lidovka = soup(get(url))
+    Food_items = lidovka.find_all("td")
+    for item in Food_items:
+        value = item.find("p").text.strip()
+        if value == "Espresso":
+            break
+        if value == "":
+            continue
+        print(value)
+        
+        if ("segedín" in value.lower() or "segedin" in value.lower()) and "soj" in value.lower(): 
+            sender()
 
-Scrape the world! 
-"""
+def sender():
+    subject = "SOJOVÝ SEGEDÍN ALERT!"
+    text = "Ahoj E.,\n\n Mám pro tebe dobrou zprávu! SOJOVÝ SEGEDÍN JE V NABÍDCE. Pro jistotu si to zkontroluj na https://lidovajidelna.cz a naplánuj si cestu za dobrůtkou!"
+    message = f"From: {sender_email}\r\nTo: {email}\r\nSubject:{subject}\r\n{text}"
+    send_email(port, smtp_server, sender_email, password, email, message)            
+        
+if __name__ == '__main__':
+    main() 
